@@ -1,8 +1,9 @@
 # Écoute les nombres — French Numbers Listening Game
 
-A tiny browser game for practising French numbers by ear. It picks a random
-number, speaks it aloud in French, and you type what you heard. Supports both
-**France** and **Switzerland** number systems.
+A tiny browser game for practising French numbers by ear. Each game is
+**10 rounds against the clock**: it speaks a random number aloud in French, you
+type what you heard, and at the end you get a results screen with your score out
+of 10 and your time. Supports both **France** and **Switzerland** number systems.
 
 No build step, no dependencies, no server — just static HTML/CSS/JS, ready for
 GitHub Pages.
@@ -14,9 +15,12 @@ GitHub Pages.
      or 🇨🇭 Suisse (`septante`, `huitante`, `nonante`).
    - **Answer mode** — *Digits* (type `72`) or *French words* (type `septante-deux`).
    - **Range** — `0–9`, `0–99`, `0–999`, or `0–9999`.
-2. Press **Play number** to hear it. Press **Replay** (or the <kbd>Space</kbd> key) to hear it again.
-3. Type your answer and press **Check** (or <kbd>Enter</kbd>).
-4. **Reveal** shows the answer if you're stuck. **Next number** continues.
+2. Press **Start game**. The timer begins and you play **10 rounds**.
+3. Each round: listen, then type your answer and press **Check** (or <kbd>Enter</kbd>).
+   Press the big button (or <kbd>Space</kbd>) to **Replay** the number, and **Reveal**
+   if you're stuck. Then **Next** moves on.
+4. After round 10 you get a **results screen**: how many you got right out of 10,
+   your total time and average per round, a recap of every number, and **Play again**.
 
 Words-mode grading is lenient about capitals, accents, hyphens, and spaces —
 `quatre-vingt-un`, `Quatre vingt un`, and `QUATRE-VINGT-UN` all count.
@@ -25,7 +29,6 @@ Words-mode grading is lenient about capitals, accents, hyphens, and spaces —
 
 - **Speech speed** — slow the voice down while you're learning.
 - **Voice** — pick a specific French voice, or leave it on automatic.
-- **Timed mode** — answer before the bar runs out, with an adjustable time limit.
 
 ## A note on audio
 

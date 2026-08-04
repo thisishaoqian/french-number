@@ -1,50 +1,51 @@
-/* app.js — game logic for the French numbers listening game */
+/* app.js — 10-round timed French numbers listening game */
 (function () {
   'use strict';
 
   var FN = window.FrenchNumbers;
+  var ROUNDS = 10;
 
   // ---- State ----
   var state = {
     variant: 'fr',      // 'fr' | 'ch'
     mode: 'digit',      // 'digit' | 'words'
     max: 99,
-    current: null,      // current number
-    answered: false,    // has the current number been resolved?
-    score: 0,
-    streak: 0,
-    best: 0,
-    attempts: 0,
-    correct: 0,
     rate: 0.9,
-    voiceURI: '',       // chosen voice, '' = auto
-    timed: false,
-    seconds: 10
+    voiceURI: '',       // '' = auto
+
+    active: false,      // is a game in progress?
+    round: 0,           // current round number (1..ROUNDS)
+    current: null,      // current number
+    answered: false,    // has the current round been resolved?
+    correct: 0,         // correct answers so far
+    results: [],        // [{round, n, correct}]
+    startTime: 0        // ms timestamp when the game began
   };
 
   // ---- Elements ----
   var el = {
     play: document.getElementById('play'),
     playLabel: document.getElementById('play-label'),
-    replay: document.getElementById('replay'),
     form: document.getElementById('answer-form'),
     input: document.getElementById('answer'),
+    check: document.getElementById('check'),
     reveal: document.getElementById('reveal'),
     feedback: document.getElementById('feedback'),
+    stage: document.getElementById('stage'),
     range: document.getElementById('range'),
-    score: document.getElementById('score'),
-    streak: document.getElementById('streak'),
-    best: document.getElementById('best'),
-    accuracy: document.getElementById('accuracy'),
+    round: document.getElementById('round'),
+    correct: document.getElementById('correct'),
+    time: document.getElementById('time'),
+    results: document.getElementById('results'),
+    rCorrect: document.getElementById('r-correct'),
+    rTime: document.getElementById('r-time'),
+    rAvg: document.getElementById('r-avg'),
+    rList: document.getElementById('r-list'),
+    playagain: document.getElementById('playagain'),
     rate: document.getElementById('rate'),
     rateOut: document.getElementById('rate-out'),
     voice: document.getElementById('voice'),
-    voiceNote: document.getElementById('voice-note'),
-    timed: document.getElementById('timed'),
-    seconds: document.getElementById('seconds'),
-    secondsOut: document.getElementById('seconds-out'),
-    timerbar: document.getElementById('timerbar'),
-    timerfill: document.getElementById('timerfill')
+    voiceNote: document.getElementById('voice-note')
   };
 
   // ---- Speech ----
@@ -73,11 +74,8 @@
     el.voice.value = state.voiceURI;
   }
 
-  function preferredLang() {
-    return state.variant === 'ch' ? 'fr-CH' : 'fr-FR';
-  }
+  function preferredLang() { return state.variant === 'ch' ? 'fr-CH' : 'fr-FR'; }
 
-  // Pick a voice: explicit choice, else exact lang, else any French, else null.
   function pickVoice() {
     if (state.voiceURI) {
       var chosen = voices.find(function (v) { return v.voiceURI === state.voiceURI; });
@@ -95,7 +93,7 @@
       return;
     }
     if (voices.length === 0) {
-      el.voiceNote.textContent = '⚠ No French voice found on this device. Numbers will still be spoken with the default voice, and the spelling is always revealed.';
+      el.voiceNote.textContent = '⚠ No French voice found on this device. Numbers are spoken with the default voice, and the spelling is always revealed.';
       return;
     }
     var v = pickVoice();
@@ -107,9 +105,8 @@
   }
 
   function speakCurrent() {
-    if (state.current === null) return;
+    if (state.current === null || !synth) return;
     var text = FN.numberToFrench(state.current, state.variant);
-    if (!synth) return;
     synth.cancel();
     var u = new SpeechSynthesisUtterance(text);
     var v = pickVoice();
@@ -122,56 +119,60 @@
     synth.speak(u);
   }
 
-  // ---- Timer (timed mode) ----
-  var timerId = null;
-  var timerStart = 0;
-
-  function startTimer() {
-    stopTimer();
-    if (!state.timed) return;
-    el.timerbar.hidden = false;
-    el.timerfill.style.transition = 'none';
-    el.timerfill.style.transform = 'scaleX(1)';
-    // force reflow so the reset applies before animating
-    void el.timerfill.offsetWidth;
-    var ms = state.seconds * 1000;
-    el.timerfill.style.transition = 'transform ' + ms + 'ms linear';
-    el.timerfill.style.transform = 'scaleX(0)';
-    timerStart = Date.now();
-    timerId = setTimeout(function () { onTimeout(); }, ms);
+  // ---- Clock ----
+  var clockId = null;
+  function fmt(ms) {
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
   }
-
-  function stopTimer() {
-    if (timerId) { clearTimeout(timerId); timerId = null; }
-    el.timerbar.hidden = true;
+  function startClock() {
+    stopClock();
+    clockId = setInterval(function () {
+      el.time.textContent = fmt(Date.now() - state.startTime);
+    }, 250);
   }
-
-  function onTimeout() {
-    if (state.answered) return;
-    resolve(false, true);
-  }
+  function stopClock() { if (clockId) { clearInterval(clockId); clockId = null; } }
 
   // ---- Game flow ----
   function randInt(max) { return Math.floor(Math.random() * (max + 1)); }
 
-  function nextNumber() {
+  function startGame() {
+    state.active = true;
+    state.round = 0;
+    state.correct = 0;
+    state.results = [];
+    state.startTime = Date.now();
+    el.results.hidden = true;
+    el.stage.hidden = false;
+    el.correct.textContent = '0';
+    el.time.textContent = '0:00';
+    el.playLabel.textContent = 'Replay';
+    startClock();
+    nextRound();
+  }
+
+  function nextRound() {
+    state.round++;
+    if (state.round > ROUNDS) { endGame(); return; }
     state.current = randInt(state.max);
     state.answered = false;
+    el.round.textContent = state.round + ' / ' + ROUNDS;
     el.input.value = '';
     el.input.disabled = false;
     el.reveal.disabled = false;
+    el.check.textContent = 'Check';
     el.feedback.className = 'feedback';
     el.feedback.textContent = '';
-    el.replay.hidden = false;
-    el.playLabel.textContent = 'Play number';
     el.input.focus();
     speakCurrent();
-    startTimer();
   }
 
   function expectedAnswer() {
-    if (state.mode === 'digit') return String(state.current);
-    return FN.numberToFrench(state.current, state.variant);
+    return state.mode === 'digit'
+      ? String(state.current)
+      : FN.numberToFrench(state.current, state.variant);
   }
 
   function isCorrect(raw) {
@@ -182,106 +183,102 @@
     return FN.normalizeFrench(raw) === FN.normalizeFrench(expectedAnswer());
   }
 
-  // resolve the current number: correct = boolean, timedOut = boolean
-  function resolve(correct, timedOut) {
+  function resolveRound(correct) {
     if (state.answered) return;
     state.answered = true;
-    stopTimer();
     synth && synth.cancel();
     el.play.classList.remove('is-speaking');
     el.input.disabled = true;
     el.reveal.disabled = true;
 
-    state.attempts++;
+    state.results.push({ round: state.round, n: state.current, correct: correct });
+    var spelling = FN.numberToFrench(state.current, state.variant);
     if (correct) {
       state.correct++;
-      state.streak++;
-      if (state.streak > state.best) state.best = state.streak;
-      var points = 10 + Math.min(state.streak - 1, 10); // small streak bonus
-      state.score += points;
       el.feedback.className = 'feedback is-ok';
-      el.feedback.innerHTML = '✓ Correct! <span class="spelling">' + state.current + ' = ' +
-        FN.numberToFrench(state.current, state.variant) + '</span> (+' + points + ')';
+      el.feedback.innerHTML = '✓ Correct! <span class="spelling">' + state.current + ' = ' + spelling + '</span>';
     } else {
-      state.streak = 0;
       el.feedback.className = 'feedback is-err';
-      var lead = timedOut ? '⏱ Time! ' : '✗ ';
-      el.feedback.innerHTML = lead + 'The answer was <span class="spelling">' +
-        state.current + ' = ' + FN.numberToFrench(state.current, state.variant) + '</span>';
+      el.feedback.innerHTML = '✗ The answer was <span class="spelling">' + state.current + ' = ' + spelling + '</span>';
     }
-    updateStats();
-    el.playLabel.textContent = 'Next number';
+    el.correct.textContent = state.correct;
+    el.check.textContent = state.round === ROUNDS ? 'See results' : 'Next';
   }
 
-  function updateStats() {
-    el.score.textContent = state.score;
-    el.streak.textContent = state.streak;
-    el.best.textContent = state.best;
-    el.accuracy.textContent = state.attempts
-      ? Math.round((state.correct / state.attempts) * 100) + '%'
-      : '—';
+  function endGame() {
+    state.active = false;
+    state.answered = true;
+    stopClock();
+    var totalMs = Date.now() - state.startTime;
+
+    el.rCorrect.textContent = state.correct;
+    el.rTime.textContent = fmt(totalMs);
+    el.rAvg.textContent = (totalMs / ROUNDS / 1000).toFixed(1) + 's';
+    el.time.textContent = fmt(totalMs);
+
+    el.rList.innerHTML = '';
+    state.results.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = r.correct ? 'ok' : 'err';
+      li.innerHTML = '<span class="r-mark">' + (r.correct ? '✓' : '✗') + '</span>' +
+        '<span class="r-num">' + r.n + '</span>' +
+        '<span class="r-word">' + FN.numberToFrench(r.n, state.variant) + '</span>';
+      el.rList.appendChild(li);
+    });
+
+    el.stage.hidden = true;
+    el.results.hidden = false;
   }
 
-  // ---- Event wiring ----
+  // ---- Events ----
   el.play.addEventListener('click', function () {
-    if (state.current === null || state.answered) {
-      nextNumber();       // start / advance
-    } else {
-      speakCurrent();     // replay while unanswered
-    }
-  });
-
-  el.replay.addEventListener('click', function () {
-    if (state.current !== null) speakCurrent();
+    if (!state.active) { startGame(); return; }
+    speakCurrent();                       // replay during a game
   });
 
   el.form.addEventListener('submit', function (e) {
     e.preventDefault();
-    if (state.current === null) { nextNumber(); return; }
-    if (state.answered) { nextNumber(); return; }
+    if (!state.active) { startGame(); return; }
+    if (state.answered) { nextRound(); return; }  // advance (or end)
     var raw = el.input.value.trim();
     if (!raw) return;
-    resolve(isCorrect(raw), false);
+    resolveRound(isCorrect(raw));
   });
 
   el.reveal.addEventListener('click', function () {
-    if (state.current === null || state.answered) return;
-    resolve(false, false);
+    if (!state.active || state.answered) return;
+    resolveRound(false);
   });
 
-  // Segmented buttons (variant + mode)
+  el.playagain.addEventListener('click', startGame);
+
+  // Segmented controls
   document.querySelectorAll('.seg[data-variant]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      setSegment('data-variant', btn, function () { state.variant = btn.dataset.variant; });
+      setSegment(btn, 'variant');
+      state.variant = btn.dataset.variant;
       updateVoiceNote();
-      // re-speak so the change is audible if a number is active & unanswered
-      if (state.current !== null && !state.answered) speakCurrent();
+      if (state.active && !state.answered) speakCurrent();
     });
   });
   document.querySelectorAll('.seg[data-mode]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      setSegment('data-mode', btn, function () {
-        state.mode = btn.dataset.mode;
-        el.input.setAttribute('inputmode', state.mode === 'digit' ? 'numeric' : 'text');
-        el.input.placeholder = state.mode === 'digit' ? 'Type the number…' : 'Type it in French…';
-      });
+      setSegment(btn, 'mode');
+      state.mode = btn.dataset.mode;
+      el.input.setAttribute('inputmode', state.mode === 'digit' ? 'numeric' : 'text');
+      if (!state.active) el.input.placeholder = 'Press Start to begin…';
     });
   });
-
-  function setSegment(attr, btn, apply) {
-    var group = btn.parentElement.querySelectorAll('[' + attr + ']');
-    group.forEach(function (b) { b.setAttribute('aria-checked', 'false'); });
+  function setSegment(btn, kind) {
+    btn.parentElement.querySelectorAll('.seg').forEach(function (b) { b.setAttribute('aria-checked', 'false'); });
     btn.setAttribute('aria-checked', 'true');
-    apply();
   }
 
-  el.range.addEventListener('change', function () {
-    state.max = parseInt(el.range.value, 10);
-  });
+  el.range.addEventListener('change', function () { state.max = parseInt(el.range.value, 10); });
 
   el.rate.addEventListener('input', function () {
     state.rate = parseFloat(el.rate.value);
-    el.rateOut.textContent = state.rate.toFixed(2).replace(/0$/, '') + '×';
+    el.rateOut.textContent = (Math.round(state.rate * 100) / 100) + '×';
   });
 
   el.voice.addEventListener('change', function () {
@@ -289,23 +286,11 @@
     updateVoiceNote();
   });
 
-  el.timed.addEventListener('change', function () {
-    state.timed = el.timed.checked;
-    if (!state.timed) stopTimer();
-    else if (state.current !== null && !state.answered) startTimer();
-  });
-
-  el.seconds.addEventListener('input', function () {
-    state.seconds = parseInt(el.seconds.value, 10);
-    el.secondsOut.textContent = state.seconds + 's';
-  });
-
-  // Space to replay (when not typing in the input)
+  // Space = replay (when not typing)
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && document.activeElement !== el.input) {
       e.preventDefault();
-      if (state.current !== null && !state.answered) speakCurrent();
-      else nextNumber();
+      if (state.active && !state.answered) speakCurrent();
     }
   });
 
@@ -313,10 +298,8 @@
   if (synth) {
     loadVoices();
     synth.onvoiceschanged = loadVoices;
-    // Safari sometimes needs a nudge
     setTimeout(loadVoices, 300);
   } else {
     updateVoiceNote();
   }
-  updateStats();
 })();
