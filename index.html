@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Écoute les nombres — French Numbers Listening Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Écoute les nombres</h1>
+      <p class="tagline">Listen to the number in French, then type what you hear.</p>
+    </header>
+
+    <section class="controls" aria-label="Game settings">
+      <div class="control">
+        <span class="control__label">Variant</span>
+        <div class="segmented" role="radiogroup" aria-label="French variant">
+          <button class="seg" data-variant="fr" role="radio" aria-checked="true">🇫🇷 France</button>
+          <button class="seg" data-variant="ch" role="radio" aria-checked="false">🇨🇭 Suisse</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <span class="control__label">Answer mode</span>
+        <div class="segmented" role="radiogroup" aria-label="Answer mode">
+          <button class="seg" data-mode="digit" role="radio" aria-checked="true">123 Digits</button>
+          <button class="seg" data-mode="words" role="radio" aria-checked="false">abc French words</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <label class="control__label" for="range">Range</label>
+        <select id="range">
+          <option value="9">0 – 9</option>
+          <option value="99" selected>0 – 99</option>
+          <option value="999">0 – 999</option>
+          <option value="9999">0 – 9999</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="stage">
+      <button id="play" class="play" aria-label="Play the number">
+        <span class="play__icon" aria-hidden="true">▶</span>
+        <span id="play-label" class="play__text">Play number</span>
+      </button>
+      <button id="replay" class="replay" hidden>↻ Replay</button>
+
+      <div id="timerbar" class="timerbar" hidden><div id="timerfill" class="timerbar__fill"></div></div>
+
+      <form id="answer-form" class="answer" autocomplete="off">
+        <input id="answer" class="answer__input" type="text" inputmode="numeric"
+               placeholder="Type the number…" aria-label="Your answer" autofocus>
+        <button type="submit" class="btn btn--primary">Check</button>
+        <button type="button" id="reveal" class="btn btn--ghost">Reveal</button>
+      </form>
+
+      <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="stats" aria-label="Statistics">
+      <div class="stat"><span class="stat__value" id="score">0</span><span class="stat__key">Score</span></div>
+      <div class="stat"><span class="stat__value" id="streak">0</span><span class="stat__key">Streak</span></div>
+      <div class="stat"><span class="stat__value" id="best">0</span><span class="stat__key">Best</span></div>
+      <div class="stat"><span class="stat__value" id="accuracy">—</span><span class="stat__key">Accuracy</span></div>
+    </section>
+
+    <details class="settings">
+      <summary>⚙ Settings</summary>
+      <div class="settings__body">
+        <label class="setting">
+          <span>Speech speed</span>
+          <input id="rate" type="range" min="0.5" max="1.2" step="0.05" value="0.9">
+          <output id="rate-out">0.9×</output>
+        </label>
+        <label class="setting">
+          <span>Voice</span>
+          <select id="voice"></select>
+        </label>
+        <label class="setting setting--check">
+          <input id="timed" type="checkbox">
+          <span>Timed mode (answer before the bar runs out)</span>
+        </label>
+        <label class="setting">
+          <span>Seconds per question</span>
+          <input id="seconds" type="range" min="4" max="20" step="1" value="10">
+          <output id="seconds-out">10s</output>
+        </label>
+        <p id="voice-note" class="voice-note"></p>
+      </div>
+    </details>
+
+    <footer class="app__footer">
+      <span id="prompt-hint">Press <kbd>Enter</kbd> to check · <kbd>Space</kbd> to replay</span>
+    </footer>
+  </main>
+
+  <script src="numbers-fr.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
